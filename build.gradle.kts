@@ -18,6 +18,9 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
+    implementation("io.socket:socket.io-client:2.0.0") {
+        exclude("org.json", "json")
+    }
 }
 
 tasks.withType<KotlinCompile>() {
