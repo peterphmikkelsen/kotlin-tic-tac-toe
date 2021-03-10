@@ -23,10 +23,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.awt.image.BufferedImage
+import java.io.File
 import java.util.*
+import javax.imageio.ImageIO
 import kotlin.math.floor
 
-fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe") {
+fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe", icon = getWindowIcon()) {
     val board = remember { SnapshotStateList<SnapshotStateList<String>>() }
     val playerInTurn = remember { mutableStateOf("✕") }
     val winner = remember { mutableStateOf("") }
@@ -201,4 +204,9 @@ private fun checkWinner(board: SnapshotStateList<SnapshotStateList<String>>): St
     if (board.all { it.all { square -> square != "" } })
         return "DRAW..."
     return ""
+}
+
+private fun getWindowIcon(): BufferedImage {
+    return ImageIO.read(File("src/main/resources/tic-tac-toe-icon.png"))
+        ?: BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB)
 }
