@@ -8,6 +8,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -48,7 +50,6 @@ fun main() = Window(size = IntSize(1250, 800), title = "Tic-Tac-Toe", icon = get
     socket.on("connect") { id.value = socket.id() }
     socket.on("incoming-challenge") {
         incomingChallenger.value = "Incoming challenge from: ${it[0] as String}"
-        // TODO: Show accept and decline buttons
     }
 
     MaterialTheme {
@@ -83,23 +84,25 @@ fun main() = Window(size = IntSize(1250, 800), title = "Tic-Tac-Toe", icon = get
                             onValueChange = { textValue = it },
                             label = { Text("Opponent ID", fontWeight = FontWeight.Bold) },
                             placeholder = { Text("E.g. 0yswdMPtFFCj6LztAAAH") },
-                            modifier = Modifier.size(width = 480.dp, height = 62.dp),
+                            modifier = Modifier.size(width = 475.dp, height = 62.dp),
                             activeColor = Color(84, 154, 255),
                             singleLine = true,
                             maxLines = 1,
+                            isErrorValue = (textValue != "" && (textValue.length < 20 || textValue.length > 20)),
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                             onImeActionPerformed = { action, _ ->
                                 if (action == ImeAction.Done)
                                     socket.sendChallenge(textValue, pendingChallenge)
                             }
                         )
+                        Spacer(Modifier.size(10.dp))
                         Button(
                             onClick = { socket.sendChallenge(textValue, pendingChallenge) },
                             colors = ButtonConstants.defaultButtonColors(Color(84, 154, 255)),
-                            modifier = Modifier.size(63.dp).padding(start = 10.dp, top = 10.dp),
+                            modifier = Modifier.padding(top = 11.dp),
                         ) {
                             Icon(
-                                Icons.Rounded.ArrowForward.copy(defaultHeight = 63.dp, defaultWidth = 63.dp),
+                                Icons.Rounded.ArrowForward.copy(defaultHeight = 32.dp, defaultWidth = 32.dp),
                                 tint = Color.White,
                             )
                         }
@@ -107,7 +110,31 @@ fun main() = Window(size = IntSize(1250, 800), title = "Tic-Tac-Toe", icon = get
                     Spacer(Modifier.size(50.dp))
                     Text(pendingChallenge.value)
                     Spacer(Modifier.size(20.dp))
-                    Text(incomingChallenger.value)
+                    if (incomingChallenger.value != "") {
+                        Text(incomingChallenger.value)
+                        Spacer(Modifier.size(10.dp))
+                        Row {
+                            Button(
+                                colors = ButtonConstants.defaultButtonColors(Color.Green),
+                                onClick = {}
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Check.copy(defaultHeight = 32.dp, defaultWidth = 32.dp),
+                                    tint = Color.White
+                                )
+                            }
+                            Spacer(Modifier.size(15.dp))
+                            Button(
+                                colors = ButtonConstants.defaultButtonColors(Color.Red),
+                                onClick = {}
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Clear.copy(defaultHeight = 32.dp, defaultWidth = 32.dp),
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -221,6 +248,7 @@ fun RotatingRefreshButton(
 }
 
 private fun Socket.sendChallenge(userId: String, pendingChallenge: MutableState<String>) {
+    if (userId == "") return
     println("Challenging: $userId")
     this.emit("challenge", userId)
     pendingChallenge.value = "Pending challenge to $userId"
