@@ -15,29 +15,40 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.gesture.pressIndicatorGestureFilter
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.input.pointer.pointerMoveFilter
+import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.socket.client.IO
+import io.socket.client.Socket
 import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
 import kotlin.math.floor
 
-fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe", icon = getWindowIcon()) {
+fun main() = Window(size = IntSize(1250, 800), title = "Tic-Tac-Toe", icon = getWindowIcon()) {
     val board = remember { SnapshotStateList<SnapshotStateList<String>>() }
     val playerInTurn = remember { mutableStateOf("✕") }
     val winner = remember { mutableStateOf("") }
-    val uuid by remember { mutableStateOf(UUID.randomUUID()) }
-    val color = Color(84, 154, 255)
+    val id = remember { mutableStateOf("") }
+    val hoverColor = remember { mutableStateOf(Color.LightGray) }
+    val incomingChallenger = remember { mutableStateOf("") }
+    val pendingChallenge = remember { mutableStateOf("") }
 
     repeat(3) {
         board.add(mutableStateListOf("", "", ""))
+    }
+
+    val socket = IO.socket("http://localhost:3000")
+    socket.on("connect") { id.value = socket.id() }
+    socket.on("incoming-challenge") {
+        incomingChallenger.value = "Incoming challenge from: ${it[0] as String}"
+        // TODO: Show accept and decline buttons
     }
 
     MaterialTheme {
@@ -49,14 +60,14 @@ fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe", icon = get
                     Box(modifier = Modifier.width(540.dp)) {
                         Text(showingText, fontSize = 42.sp, fontWeight = FontWeight.Bold)
                     }
-                    RotatingRefreshButton(board, playerInTurn, winner)
+                    RotatingRefreshButton(board, playerInTurn, winner, hoverColor)
                 }
                 Spacer(Modifier.size(20.dp))
-                Board(board, playerInTurn, winner)
+                Board(board, playerInTurn, winner, hoverColor)
                 Spacer(Modifier.size(20.dp))
                 Row {
                     Text("Your ID: ", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    ClickableText(AnnotatedString("$uuid"), style = TextStyle(fontSize = 20.sp)) {}
+                    ClickableText(AnnotatedString(id.value), style = TextStyle(fontSize = 20.sp)) {}
                 }
             }
             Box(modifier = Modifier.fillMaxHeight().padding(start = 20.dp)) {
@@ -71,21 +82,21 @@ fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe", icon = get
                             textValue,
                             onValueChange = { textValue = it },
                             label = { Text("Opponent ID", fontWeight = FontWeight.Bold) },
-                            placeholder = { Text("E.g. 123e4567-e89b-12d3-a456-426614174000") },
+                            placeholder = { Text("E.g. 0yswdMPtFFCj6LztAAAH") },
                             modifier = Modifier.size(width = 480.dp, height = 62.dp),
-                            activeColor = color,
+                            activeColor = Color(84, 154, 255),
                             singleLine = true,
                             maxLines = 1,
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                            onImeActionPerformed = { action, softwareController ->
+                            onImeActionPerformed = { action, _ ->
                                 if (action == ImeAction.Done)
-                                    sendChallenge()
+                                    socket.sendChallenge(textValue, pendingChallenge)
                             }
                         )
                         Button(
-                            onClick = { sendChallenge() },
-                            colors = ButtonConstants.defaultButtonColors(color),
-                            modifier = Modifier.size(63.dp).padding(start = 10.dp, top = 10.dp)
+                            onClick = { socket.sendChallenge(textValue, pendingChallenge) },
+                            colors = ButtonConstants.defaultButtonColors(Color(84, 154, 255)),
+                            modifier = Modifier.size(63.dp).padding(start = 10.dp, top = 10.dp),
                         ) {
                             Icon(
                                 Icons.Rounded.ArrowForward.copy(defaultHeight = 63.dp, defaultWidth = 63.dp),
@@ -93,17 +104,23 @@ fun main() = Window(size = IntSize(1250, 900), title = "Tic-Tac-Toe", icon = get
                             )
                         }
                     }
+                    Spacer(Modifier.size(50.dp))
+                    Text(pendingChallenge.value)
+                    Spacer(Modifier.size(20.dp))
+                    Text(incomingChallenger.value)
                 }
             }
         }
     }
+    socket.connect()
 }
 
 @Composable
 fun Board(
     board: SnapshotStateList<SnapshotStateList<String>>,
     playerInTurn: MutableState<String>,
-    winner: MutableState<String>
+    winner: MutableState<String>,
+    hoverColor: MutableState<Color>
 ) {
     Box(
         modifier = Modifier.size(600.dp).border(10.dp, Color.Black)
@@ -121,6 +138,7 @@ fun Board(
                 val winnerStatus = checkWinner(board)
                 if (winnerStatus != "") {
                     winner.value = winnerStatus
+                    hoverColor.value = Color.DarkGray
                 }
 
                 playerInTurn.value = if (playerInTurn.value == "✕") "○" else "✕"
@@ -141,15 +159,25 @@ fun Board(
 @Composable
 fun Square(x: Int, y: Int, board: SnapshotStateList<SnapshotStateList<String>>) {
     Box(modifier = Modifier.size(200.dp).border(2.dp, color = Color.Black)) {
-        Text(board[x][y], fontSize = 150.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize())
+        Text(board[x][y],
+            fontSize = 150.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxSize(),
+            color = if (board[x][y] == "✕") Color(139,0,0) else Color(84, 154, 255)
+        )
     }
 }
 
 @Composable
-fun RotatingRefreshButton(board: SnapshotStateList<SnapshotStateList<String>>, playerInTurn: MutableState<String>, winner: MutableState<String>) {
+fun RotatingRefreshButton(
+    board: SnapshotStateList<SnapshotStateList<String>>,
+    playerInTurn: MutableState<String>,
+    winner: MutableState<String>,
+    hoverColor: MutableState<Color>
+) {
     var flag by remember { mutableStateOf(false) }
     val rotation = FloatPropKey()
-    val def = transitionDefinition<Int> {
+    val transitionDefinition = transitionDefinition<Int> {
         state(0) { this[rotation] = 0f }
         state(1) { this[rotation] = 360f }
 
@@ -157,10 +185,10 @@ fun RotatingRefreshButton(board: SnapshotStateList<SnapshotStateList<String>>, p
             rotation using repeatable(animation = tween(500), iterations = 1)
         }
     }
-    Transition(definition = def, initState = 0, toState = if (flag) 1 else 0) { state ->
+    Transition(definition = transitionDefinition, initState = 0, toState = if (flag) 1 else 0) { state ->
         Icon(
             Icons.Rounded.Refresh.copy(defaultHeight = 60.dp, defaultWidth = 60.dp),
-            tint = if (winner.value != "") Color.DarkGray else Color.LightGray,
+            tint = hoverColor.value,
             modifier = Modifier.rotate(state[rotation])
                 .pressIndicatorGestureFilter(
                     onStart = {
@@ -175,13 +203,27 @@ fun RotatingRefreshButton(board: SnapshotStateList<SnapshotStateList<String>>, p
                             flag = true
                         }
                     })
+                .pointerMoveFilter(
+                    onEnter = {
+                        if (winner.value != "")
+                            hoverColor.value = Color.LightGray
+                        false
+                    },
+                    onExit = {
+                        if (winner.value != "")
+                            hoverColor.value = Color.DarkGray
+                        false
+                    }
+                )
         )
     }
 
 }
 
-private fun sendChallenge() {
-    // TODO: Handle challenging a friend
+private fun Socket.sendChallenge(userId: String, pendingChallenge: MutableState<String>) {
+    println("Challenging: $userId")
+    this.emit("challenge", userId)
+    pendingChallenge.value = "Pending challenge to $userId"
 }
 
 private fun checkWinner(board: SnapshotStateList<SnapshotStateList<String>>): String
