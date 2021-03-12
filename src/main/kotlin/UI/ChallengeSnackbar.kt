@@ -14,9 +14,12 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun ChallengeSnackbar(visible: MutableState<Boolean>, pendingChallenge: MutableState<String>, challengeState: MutableState<ChallengeState>) {
+fun ChallengeSnackbar(
+    pendingChallenge: MutableState<String>,
+    challengeState: MutableState<ChallengeState>
+) {
     AnimatedVisibility(
-        visible = visible.value,
+        visible = challengeState.value == ChallengeState.PENDING,
         enter = slideInVertically(initialOffsetY = { -100 }, animSpec = tween(durationMillis = 1000)),
         exit = fadeOut(animSpec = tween(durationMillis = 1000, delayMillis = 1000))
     ) {

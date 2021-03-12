@@ -28,11 +28,12 @@ fun main() = Window(size = IntSize(1250, 785), title = "Tic-Tac-Toe", icon = get
     val winner = remember { mutableStateOf("") }
     val id = remember { mutableStateOf("") }
     val hoverColor = remember { mutableStateOf(Color.LightGray) }
-    val incomingChallenger = remember { mutableStateOf("") }
-    val incomingChallenge = remember { mutableStateOf(false) }
+
+    val opponentId = remember { mutableStateOf("") }
+    val hasIncomingChallenge = remember { mutableStateOf(false) }
+
     val pendingChallengeId = remember { mutableStateOf("") }
     val challengeState = remember { mutableStateOf(ChallengeState.NONE) }
-    val snackbarVisible = remember { mutableStateOf(false) }
 
     repeat(3) {
         board.add(mutableStateListOf("", "", ""))
@@ -45,18 +46,37 @@ fun main() = Window(size = IntSize(1250, 785), title = "Tic-Tac-Toe", icon = get
     }
     socket.on("incoming-challenge") {
         println("Incoming challenge from: ${it[0] as String}")
-        incomingChallenger.value = it[0] as String
-        incomingChallenge.value = true
+        opponentId.value = it[0] as String
+        hasIncomingChallenge.value = true
     }
     socket.on("challenge-accepted") {
-        println("Your challenge was accepted!")
+        val from = it[0] as String
+        println("Your challenge was accepted by $from!")
         pendingChallengeId.value = ""
         challengeState.value = ChallengeState.ACCEPTED
+        opponentId.value = from
     }
     socket.on("challenge-declined") {
-        println("Your challenge was declined...")
+        val from = it[0] as String
+        println("Your challenge was declined by $from...")
         pendingChallengeId.value = ""
         challengeState.value = ChallengeState.DECLINED
+    }
+    socket.on("move") {
+        val xRaw = it[0] as String
+        val yRaw = it[1] as String
+        val x = xRaw.toFloat().toInt()
+        val y = yRaw.toFloat().toInt()
+        board[x][y] = playerInTurn.value
+        println("Move made: ($x, $y)")
+
+        val winnerStatus = GameUtil.checkWinner(board)
+        if (winnerStatus != "") {
+            winner.value = winnerStatus
+            hoverColor.value = Color.DarkGray
+        }
+
+        playerInTurn.value = if (playerInTurn.value == "✕") "○" else "✕"
     }
 
     MaterialTheme {
@@ -71,7 +91,7 @@ fun main() = Window(size = IntSize(1250, 785), title = "Tic-Tac-Toe", icon = get
                     RotatingRefreshButton(board, playerInTurn, winner, hoverColor)
                 }
                 Spacer(Modifier.size(20.dp))
-                Board(board, playerInTurn, winner, hoverColor)
+                Board(board, playerInTurn, winner, hoverColor, opponentId, socket)
                 Spacer(Modifier.size(20.dp))
                 Row {
                     Text("Your ID: ", fontWeight = FontWeight.Bold, fontSize = 20.sp)
@@ -82,13 +102,12 @@ fun main() = Window(size = IntSize(1250, 785), title = "Tic-Tac-Toe", icon = get
                 val textValue = remember { mutableStateOf("") }
                 Column {
                     Spacer(Modifier.size(20.dp))
-                    ChallengeSnackbar(snackbarVisible, pendingChallengeId, challengeState)
-                    IncomingChallengeSnackbar(incomingChallenge, incomingChallenger, socket)
+                    ChallengeSnackbar(pendingChallengeId, challengeState)
+                    IncomingChallengeSnackbar(hasIncomingChallenge, opponentId, socket)
                 }
                 Column {
                     Spacer(Modifier.size(100.dp))
                     ChallengeFriend(textValue, socket, pendingChallengeId, challengeState)
-                    snackbarVisible.value = challengeState.value == ChallengeState.PENDING
                 }
 
             }

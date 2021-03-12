@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.socket.client.Socket
 import kotlin.math.floor
 
 @Composable
@@ -17,7 +18,9 @@ fun Board(
     board: SnapshotStateList<SnapshotStateList<String>>,
     playerInTurn: MutableState<String>,
     winner: MutableState<String>,
-    hoverColor: MutableState<Color>
+    hoverColor: MutableState<Color>,
+    opponentId: MutableState<String>,
+    socket: Socket
 ) {
     Box(
         modifier = Modifier.size(600.dp).border(10.dp, Color.Black)
@@ -31,8 +34,9 @@ fun Board(
                 if (board[x.toInt()][y.toInt()] != "") return@pressIndicatorGestureFilter
 
                 board[x.toInt()][y.toInt()] = playerInTurn.value
+                socket.emit("move", opponentId.value, "$x", "$y")
 
-                val winnerStatus = checkWinner(board)
+                val winnerStatus = GameUtil.checkWinner(board)
                 if (winnerStatus != "") {
                     winner.value = winnerStatus
                     hoverColor.value = Color.DarkGray
@@ -58,25 +62,4 @@ fun Board(
             }
         }
     }
-}
-
-private fun checkWinner(board: SnapshotStateList<SnapshotStateList<String>>): String {
-    val wins = mutableListOf<Triple<Pair<Int, Int>, Pair<Int, Int>, Pair<Int, Int>>>()
-    wins.add(Triple(Pair(0, 0), Pair(1, 0), Pair(2, 0)))
-    wins.add(Triple(Pair(0, 1), Pair(1, 1), Pair(2, 1)))
-    wins.add(Triple(Pair(0, 2), Pair(1, 2), Pair(2, 2)))
-    wins.add(Triple(Pair(0, 0), Pair(1, 1), Pair(2, 2)))
-    wins.add(Triple(Pair(0, 2), Pair(1, 1), Pair(2, 0)))
-    wins.add(Triple(Pair(0, 0), Pair(0, 1), Pair(0, 2)))
-    wins.add(Triple(Pair(1, 0), Pair(1, 1), Pair(1, 2)))
-    wins.add(Triple(Pair(2, 0), Pair(2, 1), Pair(2, 2)))
-
-    for ((i, j, k) in wins) {
-        if (board[i.first][i.second] != "" && board[i.first][i.second] == board[j.first][j.second] && board[i.first][i.second] == board[k.first][k.second])
-            return "${board[i.first][i.second]} WINS!"
-    }
-
-    if (board.all { it.all { square -> square != "" } })
-        return "DRAW..."
-    return ""
 }

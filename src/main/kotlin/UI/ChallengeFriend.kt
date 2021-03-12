@@ -19,7 +19,8 @@ import io.socket.client.Socket
 fun ChallengeFriend(
     textValue: MutableState<String>,
     socket: Socket, pendingChallenge: MutableState<String>,
-    challengeState: MutableState<ChallengeState>
+    challengeState: MutableState<ChallengeState>,
+//    currentChallengerId: MutableState<String>
 ) {
     val isNotEmptyAndCorrectLength = textValue.value != "" && (textValue.value.length < 20 || textValue.value.length > 20)
     val isOwnId = textValue.value == socket.id()
@@ -48,7 +49,7 @@ fun ChallengeFriend(
         Spacer(Modifier.size(10.dp))
         Button(
             onClick = {
-                if (!challengeIsPendingOrAccepted && !cannotChallenge)
+                if (!cannotChallenge)
                     socket.sendChallenge(textValue, pendingChallenge, challengeState)
             },
             colors = ButtonConstants.defaultButtonColors(

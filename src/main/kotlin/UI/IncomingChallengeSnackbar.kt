@@ -18,7 +18,7 @@ import io.socket.client.Socket
 @Composable
 fun IncomingChallengeSnackbar(
     visible: MutableState<Boolean>,
-    incomingChallenger: MutableState<String>,
+    opponentId: MutableState<String>,
     socket: Socket
 ) {
     AnimatedVisibility(
@@ -26,7 +26,6 @@ fun IncomingChallengeSnackbar(
         enter = slideInVertically(initialOffsetY = { -90 }, animSpec = tween(durationMillis = 1000)),
         exit = fadeOut(animSpec = tween(durationMillis = 1000, delayMillis = 1000))
     ) {
-        println(visible.value)
         Snackbar(
             modifier = Modifier.fillMaxWidth(0.95f),
             elevation = 12.dp,
@@ -39,21 +38,21 @@ fun IncomingChallengeSnackbar(
                 ) {
                     Row {
                         ControlButton(ChallengeControl.ACCEPT, 20.dp) {
-                            socket.emit("challenge-accepted", incomingChallenger.value)
+                            socket.emit("challenge-accepted", socket.id(), opponentId.value)
                             visible.value = false
-                            incomingChallenger.value = ""
+//                            opponentId.value = ""
                         }
                         Spacer(Modifier.size(5.dp))
                         ControlButton(ChallengeControl.DECLINE, 20.dp) {
-                            socket.emit("challenge-declined", incomingChallenger.value)
+                            socket.emit("challenge-declined", socket.id(), opponentId.value)
                             visible.value = false
-                            incomingChallenger.value = ""
+//                            opponentId.value = ""
                         }
                     }
                 }
             }) {
             if (visible.value) {
-                Text("Incoming challenge from: ${incomingChallenger.value}!")
+                Text("Incoming challenge from: ${opponentId.value}!")
             } else {
                 Text("Got it!")
             }
